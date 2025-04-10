@@ -2,13 +2,23 @@ package com.example.todoapp
 
 import kotlinx.coroutines.flow.Flow
 
-class TodoItemRepository(private val todoItemDao: TodoItemDao) {
-    // Basic operations
-    suspend fun insert(item: TodoItem) = todoItemDao.insert(item)
-    suspend fun update(item: TodoItem) = todoItemDao.update(item)
-    suspend fun delete(item: TodoItem) = todoItemDao.delete(item)
+class TodoItemRepository(private val dao: TodoItemDao) {
 
-    // Get operations
-    fun getAllItems(): Flow<List<TodoItem>> = todoItemDao.getAllItems()
-    fun getItemsByCompletion(isCompleted: Boolean): Flow<List<TodoItem>> = todoItemDao.getItemsByCompletion(isCompleted)
+    val allItems: Flow<List<TodoItem>> = dao.getAllItems()
+
+    fun getItemsByCompletion(isCompleted: Boolean): Flow<List<TodoItem>> {
+        return dao.getItemsByCompletion(isCompleted)
+    }
+
+    suspend fun insert(item: TodoItem) {
+        dao.insert(item)
+    }
+
+    suspend fun update(item: TodoItem) {
+        dao.update(item)
+    }
+
+    suspend fun delete(item: TodoItem) {
+        dao.delete(item)
+    }
 }
