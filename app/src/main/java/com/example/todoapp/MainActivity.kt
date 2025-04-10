@@ -5,15 +5,21 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -87,6 +93,8 @@ fun MainScreen(viewModel: MainActivityViewModel) {
 
         Button(
             onClick = {
+                if (title.isBlank()) return@Button
+
                 val item = TodoItem(title = title, description = desc)
                 coroutineScope.launch {
                     viewModel.insert(item)
@@ -103,29 +111,65 @@ fun MainScreen(viewModel: MainActivityViewModel) {
         Text(text = "TASKS:", fontSize = 30.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
 
         HorizontalDivider()
-        Spacer(modifier = Modifier.height(8.dp))
 
-        todoItems.forEach { item ->
-            TodoItemCard(item = item)
+        LazyColumn {
+            items(todoItems) { item ->
+                TodoItemCard(
+                    item = item,
+                    onToggle = { updated ->
+                        coroutineScope.launch {
+                            viewModel.update(updated)
+                        }
+                    },
+                    onDelete = {
+                        coroutineScope.launch {
+                            viewModel.delete(it)
+                        }
+                    }
+                )
+            }
         }
     }
 }
 
 @Composable
-fun TodoItemCard(item: TodoItem) {
+fun TodoItemCard(
+    item: TodoItem,
+    onToggle: (TodoItem) -> Unit,
+    onDelete: (TodoItem) -> Unit
+) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
         shape = RoundedCornerShape(10.dp)
     ) {
-        Column(modifier = Modifier.padding(15.dp)) {
-            Text(
-                text = item.title,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
+        Column(modifier = Modifier.padding(horizontal = 15.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = item.title,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Checkbox(
+                    checked = item.isDone,
+                    onCheckedChange = {
+                        onToggle(item.copy(isDone = it))
+                    }
+                )
+            }
+
             if (!item.description.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(text = item.description ?: "", fontSize = 16.sp)
+            }
+
+            Button(
+                onClick = { onDelete(item) },
+                modifier = Modifier.align(Alignment.End).offset(y = (-8).dp)
+            ) {
+                Text("Delete")
             }
         }
     }
