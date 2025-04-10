@@ -16,6 +16,10 @@ class MainActivityViewModel(application: Application) : AndroidViewModel(applica
         allItems = repository.allItems
     }
 
+    fun getItemsByCompletion(b: Boolean): Flow<List<TodoItem>> {
+        return repository.getItemsByCompletion(b)
+    }
+
     fun insert(item: TodoItem) = viewModelScope.launch {
         repository.insert(item)
     }

@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,10 +18,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -59,10 +66,18 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(viewModel: MainActivityViewModel) {
     val coroutineScope = rememberCoroutineScope()
 
-    val todoItems by viewModel.allItems.collectAsState(initial = emptyList())
+    var filterOption by remember { mutableStateOf(FilterOption.ALL) }
+
+    val todoItems by when (filterOption) {
+        FilterOption.ALL -> viewModel.allItems
+        FilterOption.TODO -> viewModel.getItemsByCompletion(false)
+        FilterOption.COMPLETED -> viewModel.getItemsByCompletion(true)
+    }.collectAsState(initial = emptyList())
 
     var title by remember { mutableStateOf("") }
     var desc by remember { mutableStateOf("") }
+
+    var expanded by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(15.dp)
@@ -91,20 +106,58 @@ fun MainScreen(viewModel: MainActivityViewModel) {
             )
         )
 
-        Button(
-            onClick = {
-                if (title.isBlank()) return@Button
-
-                val item = TodoItem(title = title, description = desc)
-                coroutineScope.launch {
-                    viewModel.insert(item)
-                    title = ""
-                    desc = ""
-                }
-            },
-            modifier = Modifier.align(Alignment.End)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Add")
+            Box {
+                IconButton(onClick = { expanded = true }) {
+                    Icon(imageVector = Icons.Default.Menu, contentDescription = "Filter By")
+                }
+
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("All") },
+                        onClick = {
+                            filterOption = FilterOption.ALL
+                            expanded = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Pending") },
+                        onClick = {
+                            filterOption = FilterOption.TODO
+                            expanded = false
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Completed") },
+                        onClick = {
+                            filterOption = FilterOption.COMPLETED
+                            expanded = false
+                        }
+                    )
+                }
+            }
+
+            Button(
+                onClick = {
+                    if (title.isBlank()) return@Button
+
+                    val item = TodoItem(title = title, description = desc)
+                    coroutineScope.launch {
+                        viewModel.insert(item)
+                        title = ""
+                        desc = ""
+                    }
+                }
+            ) {
+                Text("Add")
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -173,4 +226,8 @@ fun TodoItemCard(
             }
         }
     }
+}
+
+enum class FilterOption {
+    ALL, TODO, COMPLETED
 }
