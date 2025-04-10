@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -62,16 +64,20 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+enum class Filters {
+    ALL, TODO, COMPLETED
+}
+
 @Composable
 fun MainScreen(viewModel: MainActivityViewModel) {
     val coroutineScope = rememberCoroutineScope()
 
-    var filterOption by remember { mutableStateOf(FilterOption.ALL) }
+    var filter by remember { mutableStateOf(Filters.ALL) }
 
-    val todoItems by when (filterOption) {
-        FilterOption.ALL -> viewModel.allItems
-        FilterOption.TODO -> viewModel.getItemsByCompletion(false)
-        FilterOption.COMPLETED -> viewModel.getItemsByCompletion(true)
+    val todoItems by when (filter) {
+        Filters.ALL -> viewModel.allItems
+        Filters.TODO -> viewModel.getItemsByCompletion(false)
+        Filters.COMPLETED -> viewModel.getItemsByCompletion(true)
     }.collectAsState(initial = emptyList())
 
     var title by remember { mutableStateOf("") }
@@ -80,7 +86,9 @@ fun MainScreen(viewModel: MainActivityViewModel) {
     var expanded by remember { mutableStateOf(false) }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(15.dp)
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(15.dp)
     ) {
         OutlinedTextField(
             value = title,
@@ -123,21 +131,21 @@ fun MainScreen(viewModel: MainActivityViewModel) {
                     DropdownMenuItem(
                         text = { Text("All") },
                         onClick = {
-                            filterOption = FilterOption.ALL
+                            filter = Filters.ALL
                             expanded = false
                         }
                     )
                     DropdownMenuItem(
                         text = { Text("Pending") },
                         onClick = {
-                            filterOption = FilterOption.TODO
+                            filter = Filters.TODO
                             expanded = false
                         }
                     )
                     DropdownMenuItem(
                         text = { Text("Completed") },
                         onClick = {
-                            filterOption = FilterOption.COMPLETED
+                            filter = Filters.COMPLETED
                             expanded = false
                         }
                     )
@@ -161,7 +169,12 @@ fun MainScreen(viewModel: MainActivityViewModel) {
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-        Text(text = "TASKS:", fontSize = 30.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+
+        Text(
+            text = "TASKS",
+            fontSize = 30.sp,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        )
 
         HorizontalDivider()
 
@@ -178,6 +191,9 @@ fun MainScreen(viewModel: MainActivityViewModel) {
                         coroutineScope.launch {
                             viewModel.delete(it)
                         }
+                    },
+                    onUpdate = { updated ->
+                        coroutineScope.launch { viewModel.update(updated) }
                     }
                 )
             }
@@ -189,10 +205,18 @@ fun MainScreen(viewModel: MainActivityViewModel) {
 fun TodoItemCard(
     item: TodoItem,
     onToggle: (TodoItem) -> Unit,
-    onDelete: (TodoItem) -> Unit
+    onDelete: (TodoItem) -> Unit,
+    onUpdate: (TodoItem) -> Unit
 ) {
+    var isEditing by remember { mutableStateOf(false) }
+    var editTitle by remember { mutableStateOf(item.title) }
+    var editDesc by remember { mutableStateOf(item.description ?: "") }
+
     Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp)
+            .clickable { isEditing = true },
         shape = RoundedCornerShape(10.dp)
     ) {
         Column(modifier = Modifier.padding(horizontal = 15.dp)) {
@@ -201,11 +225,20 @@ fun TodoItemCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = item.title,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                if (isEditing) {
+                    OutlinedTextField(
+                        value = editTitle,
+                        onValueChange = { editTitle = it },
+                        label = { Text("Title") },
+                    )
+                } else {
+                    Text(
+                        text = item.title,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
                 Checkbox(
                     checked = item.isDone,
                     onCheckedChange = {
@@ -214,20 +247,49 @@ fun TodoItemCard(
                 )
             }
 
-            if (!item.description.isNullOrBlank()) {
-                Text(text = item.description ?: "", fontSize = 16.sp)
+            if (isEditing) {
+                OutlinedTextField(
+                    value = editDesc,
+                    onValueChange = { editDesc = it },
+                    label = { Text("Description") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else if (!item.description.isNullOrBlank()) {
+                Text(text = item.description!!)
             }
 
-            Button(
-                onClick = { onDelete(item) },
-                modifier = Modifier.align(Alignment.End).offset(y = (-8).dp)
-            ) {
-                Text("Delete")
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (isEditing) {
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Button(onClick = { isEditing = false }) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (editTitle.isNotBlank()) {
+                                onUpdate(item.copy(title = editTitle, description = editDesc))
+                                isEditing = false
+                            }
+                        }
+                    ) {
+                        Text("Save")
+                    }
+                }
+            } else {
+                Button(
+                    onClick = { onDelete(item) },
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .offset(y = (-15).dp)
+                ) {
+                    Text("Delete")
+                }
             }
         }
     }
-}
-
-enum class FilterOption {
-    ALL, TODO, COMPLETED
 }
